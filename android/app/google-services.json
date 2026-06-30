@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "308019367576",
+    "project_id": "doomguard-app",
+    "storage_bucket": "doomguard-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:308019367576:android:089ca0ebeac5e22bad8aed",
+        "android_client_info": {
+          "package_name": "com.example.doomguard"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "308019367576-gaennh5hlabbjn4tte7ikt9huehm2nqs.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.doomguard",
+            "certificate_hash": "c801dc49008aeaa46fef0b4ba77ed16bc78820aa"
+          }
+        },
+        {
+          "client_id": "308019367576-m4mvpviipsm3b1m7gl1vaikhvsmlr19m.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBu9KuIeNKXnK2-HfQOazbFG1J7c7v170U"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "308019367576-m4mvpviipsm3b1m7gl1vaikhvsmlr19m.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "308019367576-qu384c3c4q52vd0o9otgq7rp9r9bqqhc.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.doomguard"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
