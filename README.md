@@ -1,17 +1,68 @@
-# doomguard
+# 🛡️ DoomGuard
 
-A new Flutter project.
+DoomGuard is a Flutter-based digital wellbeing application designed to help users reduce doomscrolling habits, improve focus, and build healthier screen usage patterns through gamification and personalized insights.
 
-## Getting Started
+## ✨ Features
 
-This project is a starting point for a Flutter application.
+- 🔐 Google Sign-In Authentication
+- 📊 User Statistics Dashboard
+- 🏅 Badge and Achievement System
+- 🔥 Daily Streak Tracking
+- ⏱️ Focus Timer Sessions
+- 📈 Progress Monitoring
+- 📝 Survey Data Collection
+- 💬 Feedback System
+- 🌙 Wind-down Mode
+- 🚫 Strict Mode
+- 🔔 Smart Nudges and Notifications
+- 🎯 Daily Goals and Usage Limits
 
-A few resources to get you started if this is your first Flutter project:
+## 🏆 Badge System
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+Users earn badges automatically based on their activity and progress, including:
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+- 🌱 First Step
+- 🔥 7-Day Streak
+- ⚡ Focus Master
+- 🌙 Night Owl Tamed
+- 🧘 Zen Mode
+- 💎 Deep Worker
+- ⏰ Time Saver
+- 🏆 30-Day Legend
+
+## ☁️ Firebase Integration
+
+The app uses Firebase for:
+
+- Firebase Authentication (Google Sign-In)
+- Cloud Firestore Database
+- User Progress Synchronization
+- Badge Persistence
+- Survey and Feedback Storage
+
+## 🛠️ Tech Stack
+
+- Flutter
+- Dart
+- Firebase Authentication
+- Cloud Firestore
+- Provider State Management
+- SharedPreferences
+
+## 📱 Screens
+
+- Home
+- Statistics
+- Focus Timer
+- Streaks
+- Settings
+- Survey
+- Profile
+
+## 🚀 Installation
+
+```bash
+git clone <repository-url>
+cd Doomguard-internship-main
+flutter pub get
+flutter run
