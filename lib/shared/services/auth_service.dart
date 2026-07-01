@@ -47,6 +47,8 @@ class AuthService {
         createdAt: (data['createdAt'] as Timestamp).toDate(),
         lastLogin: now.toDate(),
         surveyCompleted: data['surveyCompleted'] as bool? ?? false,
+        isChild: data['isChild'] as bool? ?? false,
+        guardianEmail: data['guardianEmail'] as String?,
       );
     } else {
       final newUser = AppUser(
@@ -81,17 +83,38 @@ class AuthService {
       createdAt: (data['createdAt'] as Timestamp).toDate(),
       lastLogin: (data['lastLogin'] as Timestamp).toDate(),
       surveyCompleted: data['surveyCompleted'] as bool? ?? false,
+      isChild: data['isChild'] as bool? ?? false,
+      guardianEmail: data['guardianEmail'] as String?,
     );
   }
 
-  // ✅ Now takes a Map to match what AuthState passes
+  /// Saves the survey. `isChild` and `guardianEmail` are pulled out and
+  /// written top-level on the user doc (not nested under `survey`) so
+  /// backend scripts can query them directly, e.g.:
+  ///   users.where('isChild', '==', True).where('guardianEmail', '!=', None)
+  /// Everything else stays nested under `survey`, matching the existing
+  /// sync_surveys.py schema.
   Future<void> saveSurvey(String uid, Map<String, dynamic> surveyData) async {
+    final data = Map<String, dynamic>.from(surveyData);
+    final isChild = data.remove('isChild') as bool? ?? false;
+    final guardianEmail = data.remove('guardianEmail') as String?;
+
     await _firestore.collection('users').doc(uid).update({
       'survey': {
-        ...surveyData,
+        ...data,
         'completedAt': FieldValue.serverTimestamp(),
       },
       'surveyCompleted': true,
+      'isChild': isChild,
+      if (guardianEmail != null) 'guardianEmail': guardianEmail,
+    });
+  }
+
+  /// Updates just the guardian email — used from Settings, independent
+  /// of the survey flow (e.g. if the guardian's address changes later).
+  Future<void> updateGuardianEmail(String uid, String email) async {
+    await _firestore.collection('users').doc(uid).update({
+      'guardianEmail': email,
     });
   }
 

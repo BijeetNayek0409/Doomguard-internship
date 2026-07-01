@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 import '../../../shared/models/settings_state.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/models/auth_state.dart';
-import 'help_feedback_screen.dart'; // ✅ ADD
+import 'help_feedback_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -13,99 +13,124 @@ class SettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Consumer<SettingsState>(
-      builder: (_, settings, __) => Scaffold(
-        backgroundColor: DG.bg,
-        body: SafeArea(
-          child: CustomScrollView(
-            slivers: [
-              SliverToBoxAdapter(child: _buildHeader()),
-              const SliverToBoxAdapter(child: SizedBox(height: 16)),
-              SliverToBoxAdapter(child: _buildProfile(context)),
-              const SliverToBoxAdapter(child: SizedBox(height: 20)),
-              SliverToBoxAdapter(
-                child: _buildGroup('Habits', [
-                  _SettingsItem(
-                    icon: Icons.lock_rounded,
-                    label: 'Daily limit',
-                    value: _fmtLimit(settings.dailyLimitMinutes),
-                    onTap: () => _showLimitSheet(context, settings),
-                  ),
-                  _SettingsItem(
-                    icon: Icons.bedtime_rounded,
-                    label: 'Wind-down',
-                    value:
-                    '${_fmtHour(settings.downtimeStart)} – ${_fmtHour(settings.downtimeEnd)}',
-                    onTap: () => _showDowntimeSheet(context, settings),
-                  ),
-                  _SettingsItem(
-                    icon: Icons.notifications_rounded,
-                    label: 'Smart nudges',
-                    value: settings.notificationsEnabled ? 'On' : 'Off',
-                    trailing: Switch(
-                      value: settings.notificationsEnabled,
-                      onChanged: settings.setNotifications,
+      builder: (_, settings, __) {
+        final authState = context.watch<AuthState>();
+        final isChild = authState.appUser?.isChild ?? false;
+
+        return Scaffold(
+          backgroundColor: DG.bg,
+          body: SafeArea(
+            child: CustomScrollView(
+              slivers: [
+                SliverToBoxAdapter(child: _buildHeader()),
+                const SliverToBoxAdapter(child: SizedBox(height: 16)),
+                SliverToBoxAdapter(child: _buildProfile(context)),
+                const SliverToBoxAdapter(child: SizedBox(height: 20)),
+                SliverToBoxAdapter(
+                  child: _buildGroup('Habits', [
+                    _SettingsItem(
+                      icon: Icons.lock_rounded,
+                      label: 'Daily limit',
+                      value: _fmtLimit(settings.dailyLimitMinutes),
+                      onTap: () => _showLimitSheet(context, settings),
                     ),
-                  ),
-                ]),
-              ),
-              const SliverToBoxAdapter(child: SizedBox(height: 16)),
-              SliverToBoxAdapter(
-                child: _buildGroup('Account', [
-                  _SettingsItem(
-                    icon: Icons.smartphone_rounded,
-                    label: 'Strict mode',
-                    trailing: Switch(
-                      value: settings.strictMode,
-                      onChanged: settings.setStrictMode,
+                    _SettingsItem(
+                      icon: Icons.bedtime_rounded,
+                      label: 'Wind-down',
+                      value:
+                      '${_fmtHour(settings.downtimeStart)} – ${_fmtHour(settings.downtimeEnd)}',
+                      onTap: () => _showDowntimeSheet(context, settings),
                     ),
-                  ),
-                  _SettingsItem(
-                    icon: Icons.favorite_rounded,
-                    label: 'Daily goal',
-                    value: _fmtLimit(settings.dailyLimitMinutes),
-                  ),
-                  const _SettingsItem(
-                    icon: Icons.shield_rounded,
-                    label: 'Privacy',
-                  ),
-                ]),
-              ),
-              const SliverToBoxAdapter(child: SizedBox(height: 16)),
-              SliverToBoxAdapter(
-                child: _buildGroup('Support', [
-                  _SettingsItem(                          // ✅ removed const
-                    icon: Icons.help_outline_rounded,
-                    label: 'Help & feedback',
-                    onTap: () => Navigator.push(          // ✅ ADD onTap
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const HelpFeedbackScreen(),
+                    _SettingsItem(
+                      icon: Icons.notifications_rounded,
+                      label: 'Smart nudges',
+                      value: settings.notificationsEnabled ? 'On' : 'Off',
+                      trailing: Switch(
+                        value: settings.notificationsEnabled,
+                        onChanged: settings.setNotifications,
                       ),
                     ),
+                  ]),
+                ),
+                const SliverToBoxAdapter(child: SizedBox(height: 16)),
+
+                // ── Family section — only shown for accounts flagged
+                //    as under-13 during the survey.
+                if (isChild) ...[
+                  SliverToBoxAdapter(
+                    child: _buildGroup('Family', [
+                      _SettingsItem(
+                        icon: Icons.family_restroom_rounded,
+                        label: 'Guardian email',
+                        value: (authState.appUser?.guardianEmail?.isNotEmpty ==
+                            true)
+                            ? authState.appUser!.guardianEmail!
+                            : 'Not set',
+                        onTap: () => _showGuardianEmailSheet(context, authState),
+                      ),
+                    ]),
                   ),
-                  _SettingsItem(
-                    icon: Icons.logout_rounded,
-                    label: 'Sign out',
-                    danger: true,
-                    onTap: () => _confirmSignOut(context),
-                  ),
-                ]),
-              ),
-              const SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(vertical: 24),
-                  child: Text(
-                    'DoomGuard v1.0 · Made by VEBA',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: DG.mutedFg, fontSize: 11),
+                  const SliverToBoxAdapter(child: SizedBox(height: 16)),
+                ],
+
+                SliverToBoxAdapter(
+                  child: _buildGroup('Account', [
+                    _SettingsItem(
+                      icon: Icons.smartphone_rounded,
+                      label: 'Strict mode',
+                      trailing: Switch(
+                        value: settings.strictMode,
+                        onChanged: settings.setStrictMode,
+                      ),
+                    ),
+                    _SettingsItem(
+                      icon: Icons.favorite_rounded,
+                      label: 'Daily goal',
+                      value: _fmtLimit(settings.dailyLimitMinutes),
+                    ),
+                    const _SettingsItem(
+                      icon: Icons.shield_rounded,
+                      label: 'Privacy',
+                    ),
+                  ]),
+                ),
+                const SliverToBoxAdapter(child: SizedBox(height: 16)),
+                SliverToBoxAdapter(
+                  child: _buildGroup('Support', [
+                    _SettingsItem(
+                      icon: Icons.help_outline_rounded,
+                      label: 'Help & feedback',
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const HelpFeedbackScreen(),
+                        ),
+                      ),
+                    ),
+                    _SettingsItem(
+                      icon: Icons.logout_rounded,
+                      label: 'Sign out',
+                      danger: true,
+                      onTap: () => _confirmSignOut(context),
+                    ),
+                  ]),
+                ),
+                const SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24),
+                    child: Text(
+                      'DoomGuard v1.0 · Made by VEBA',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: DG.mutedFg, fontSize: 11),
+                    ),
                   ),
                 ),
-              ),
-              const SliverToBoxAdapter(child: SizedBox(height: 80)),
-            ],
+                const SliverToBoxAdapter(child: SizedBox(height: 80)),
+              ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -319,6 +344,19 @@ class SettingsScreen extends StatelessWidget {
         BorderRadius.vertical(top: Radius.circular(DG.r32)),
       ),
       builder: (_) => _DowntimeSheet(settings: settings),
+    );
+  }
+
+  void _showGuardianEmailSheet(BuildContext context, AuthState authState) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: DG.card,
+      shape: const RoundedRectangleBorder(
+        borderRadius:
+        BorderRadius.vertical(top: Radius.circular(DG.r32)),
+      ),
+      builder: (_) => _GuardianEmailSheet(authState: authState),
     );
   }
 
@@ -585,4 +623,150 @@ class _DowntimeSheetState extends State<_DowntimeSheet> {
           ),
         ],
       );
+}
+
+// ── Guardian email sheet ───────────────────────────────────────────────────────
+class _GuardianEmailSheet extends StatefulWidget {
+  final AuthState authState;
+  const _GuardianEmailSheet({required this.authState});
+
+  @override
+  State<_GuardianEmailSheet> createState() => _GuardianEmailSheetState();
+}
+
+class _GuardianEmailSheetState extends State<_GuardianEmailSheet> {
+  late final TextEditingController _controller;
+  String? _error;
+  bool _saving = false;
+
+  static final RegExp _emailRegex =
+  RegExp(r'^[\w\.\-\+]+@[\w\-]+\.[a-zA-Z]{2,}$');
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(
+      text: widget.authState.appUser?.guardianEmail ?? '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final email = _controller.text.trim();
+    if (!_emailRegex.hasMatch(email)) {
+      setState(() => _error = 'Enter a valid email address');
+      return;
+    }
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      await widget.authState.updateGuardianEmail(email);
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      setState(() {
+        _saving = false;
+        _error = 'Failed to save: $e';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 24,
+        right: 24,
+        top: 20,
+        bottom: 40 + MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                  color: DG.border,
+                  borderRadius: BorderRadius.circular(2)),
+            ),
+          ),
+          const SizedBox(height: 20),
+          const Text('Guardian Email',
+              style: TextStyle(
+                  color: DG.fg,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700)),
+          const SizedBox(height: 8),
+          const Text(
+            'Daily usage summaries are sent here as a PDF.',
+            style: TextStyle(color: DG.mutedFg, fontSize: 13),
+          ),
+          const SizedBox(height: 20),
+          TextField(
+            controller: _controller,
+            keyboardType: TextInputType.emailAddress,
+            style: const TextStyle(color: DG.fg, fontSize: 15),
+            onChanged: (_) {
+              if (_error != null) setState(() => _error = null);
+            },
+            decoration: InputDecoration(
+              hintText: 'parent@example.com',
+              hintStyle: const TextStyle(color: DG.mutedFg),
+              filled: true,
+              fillColor: DG.muted,
+              contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: DG.border, width: 1.5),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: DG.border, width: 1.5),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: DG.primary, width: 1.5),
+              ),
+              errorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: DG.destructive, width: 1.5),
+              ),
+              errorText: _error,
+            ),
+          ),
+          const SizedBox(height: 20),
+          ElevatedButton(
+            onPressed: _saving ? null : _save,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: DG.primary,
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: DG.primary.withValues(alpha: 0.5),
+              minimumSize: const Size(double.infinity, 52),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(DG.r16)),
+            ),
+            child: _saving
+                ? const SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(
+                  color: Colors.white, strokeWidth: 2.5),
+            )
+                : const Text('Save',
+                style: TextStyle(fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+  }
 }

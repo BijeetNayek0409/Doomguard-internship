@@ -11,6 +11,15 @@ class AppUser {
   final DateTime lastLogin;
   final bool surveyCompleted;
 
+  /// True when the user selected 'Under 13' during the survey.
+  /// Stored top-level (not nested under `survey`) so backend scripts
+  /// can query it directly: `.where('isChild', isEqualTo: true)`.
+  final bool isChild;
+
+  /// Guardian's alternate email, only relevant when [isChild] is true.
+  /// Null/empty until the child (or their guardian) sets it.
+  final String? guardianEmail;
+
   const AppUser({
     required this.uid,
     required this.name,
@@ -19,6 +28,8 @@ class AppUser {
     required this.createdAt,
     required this.lastLogin,
     this.surveyCompleted = false,
+    this.isChild = false,
+    this.guardianEmail,
   });
 
   /// Deserialize from Firestore document snapshot
@@ -32,6 +43,8 @@ class AppUser {
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       lastLogin: (data['lastLogin'] as Timestamp?)?.toDate() ?? DateTime.now(),
       surveyCompleted: data['surveyCompleted'] as bool? ?? false,
+      isChild: data['isChild'] as bool? ?? false,
+      guardianEmail: data['guardianEmail'] as String?,
     );
   }
 
@@ -44,6 +57,8 @@ class AppUser {
     'createdAt': Timestamp.fromDate(createdAt),
     'lastLogin': Timestamp.fromDate(lastLogin),
     'surveyCompleted': surveyCompleted,
+    'isChild': isChild,
+    'guardianEmail': guardianEmail,
   };
 
   AppUser copyWith({
@@ -54,6 +69,8 @@ class AppUser {
     DateTime? createdAt,
     DateTime? lastLogin,
     bool? surveyCompleted,
+    bool? isChild,
+    String? guardianEmail,
   }) {
     return AppUser(
       uid: uid ?? this.uid,
@@ -63,10 +80,12 @@ class AppUser {
       createdAt: createdAt ?? this.createdAt,
       lastLogin: lastLogin ?? this.lastLogin,
       surveyCompleted: surveyCompleted ?? this.surveyCompleted,
+      isChild: isChild ?? this.isChild,
+      guardianEmail: guardianEmail ?? this.guardianEmail,
     );
   }
 
   @override
   String toString() =>
-      'AppUser(uid: $uid, email: $email, surveyCompleted: $surveyCompleted)';
+      'AppUser(uid: $uid, email: $email, surveyCompleted: $surveyCompleted, isChild: $isChild)';
 }

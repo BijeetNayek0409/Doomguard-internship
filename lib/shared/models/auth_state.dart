@@ -43,10 +43,7 @@ class AuthState extends ChangeNotifier {
 
       try {
         final doc = await _authService.getUserFromFirestore(firebaseUser.uid);
-        _appUser = doc ?? _fallbackUser(firebaseUser);
-        if (doc == null) {
-          debugPrint('⚠️ No Firestore doc for UID: ${firebaseUser.uid}');
-        }
+        _appUser = doc;
       } catch (e, stack) {
         debugPrint('❌ getUserFromFirestore error: $e');
         debugPrint('$stack');
@@ -66,6 +63,8 @@ class AuthState extends ChangeNotifier {
     createdAt: DateTime.now(),
     lastLogin: DateTime.now(),
     surveyCompleted: false,
+    isChild: false,
+    guardianEmail: null,
   );
 
   Future<void> signInWithGoogle() async {
@@ -91,10 +90,30 @@ class AuthState extends ChangeNotifier {
 
     try {
       await _authService.saveSurvey(uid, surveyData);
-      _appUser = _appUser?.copyWith(surveyCompleted: true);
+      _appUser = _appUser?.copyWith(
+        surveyCompleted: true,
+        isChild: surveyData['isChild'] as bool? ?? false,
+        guardianEmail: surveyData['guardianEmail'] as String?,
+      );
       notifyListeners();
     } catch (e) {
       debugPrint('❌ saveSurvey error: $e');
+      rethrow;
+    }
+  }
+
+  /// Updates the guardian's email independently of the survey flow —
+  /// e.g. when edited later from Settings.
+  Future<void> updateGuardianEmail(String email) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    try {
+      await _authService.updateGuardianEmail(uid, email);
+      _appUser = _appUser?.copyWith(guardianEmail: email);
+      notifyListeners();
+    } catch (e) {
+      debugPrint('❌ updateGuardianEmail error: $e');
       rethrow;
     }
   }
