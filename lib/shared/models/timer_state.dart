@@ -6,7 +6,7 @@ import '../services/user_stats_service.dart'; // adjust path if your tree differ
 enum TimerMode { focus, shortBreak, longBreak }
 
 class TimerState extends ChangeNotifier {
-  static const int _focusMinutes = 1;
+  static const int _focusMinutes = 25;
   static const int _shortBreakMinutes = 5;
   static const int _longBreakMinutes = 15;
 

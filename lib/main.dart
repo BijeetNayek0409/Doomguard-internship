@@ -11,6 +11,7 @@ import 'shared/models/timer_state.dart';
 import 'shared/models/streak_state.dart';
 import 'shared/models/settings_state.dart';
 import 'shared/models/auth_state.dart';
+import 'shared/models/privacy_state.dart';
 import 'shared/services/notification_service.dart';
 
 void main() async {
@@ -29,26 +30,36 @@ void main() async {
   await NotificationService().initialize();
 
   final authState = AuthState();
+  final privacyState = PrivacyState();
 
-  runApp(DoomsGuard(authState: authState));
+  runApp(DoomsGuard(authState: authState, privacyState: privacyState));
 }
 
 class DoomsGuard extends StatefulWidget {
   final AuthState authState;
-  const DoomsGuard({super.key, required this.authState});
+  final PrivacyState privacyState;
+  const DoomsGuard({
+    super.key,
+    required this.authState,
+    required this.privacyState,
+  });
 
   @override
   State<DoomsGuard> createState() => _DoomsGuardState();
 }
 
 class _DoomsGuardState extends State<DoomsGuard> {
-  late final _router = createRouter(widget.authState);  // created once, never recreated
+  late final _router = createRouter(
+    widget.authState,
+    widget.privacyState,
+  ); // created once, never recreated
 
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider<AuthState>.value(value: widget.authState),
+        ChangeNotifierProvider<PrivacyState>.value(value: widget.privacyState),
         ChangeNotifierProvider<UsageState>(
           create: (_) {
             final service = RealUsageService();
