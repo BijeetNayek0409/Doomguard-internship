@@ -48,6 +48,7 @@ The app uses Firebase for:
 - Cloud Firestore
 - Provider State Management
 - SharedPreferences
+- Db reaver Postgre sql
 
 ## 📱 Screens
 
