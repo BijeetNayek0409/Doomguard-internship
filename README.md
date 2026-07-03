@@ -2,6 +2,9 @@
 
 DoomGuard is a Flutter-based digital wellbeing application designed to help users reduce doomscrolling habits, improve focus, and build healthier screen usage patterns through gamification and personalized insights.
 
+ Implementation of child alternate email is in progress
+parents or guardian will recieve weekly reports of the usage of child
+
 ## ✨ Features
 
 - 🔐 Google Sign-In Authentication
@@ -67,3 +70,6 @@ git clone <repository-url>
 cd Doomguard-internship-main
 flutter pub get
 flutter run
+
+
+
