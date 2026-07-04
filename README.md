@@ -5,6 +5,8 @@ DoomGuard is a Flutter-based digital wellbeing application designed to help user
  Implementation of child alternate email is in progress
 parents or guardian will recieve weekly reports of the usage of child
 
+Alternate email id done
+
 ## ✨ Features
 
 - 🔐 Google Sign-In Authentication
