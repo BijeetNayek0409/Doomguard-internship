@@ -13,8 +13,6 @@ class StatsScreen extends StatefulWidget {
 }
 
 class _StatsScreenState extends State<StatsScreen> {
-  int _tab = 1; // 0=day, 1=week, 2=month
-
   @override
   Widget build(BuildContext context) {
     return Consumer2<UsageState, TimerState>(
@@ -26,7 +24,7 @@ class _StatsScreenState extends State<StatsScreen> {
               slivers: [
                 SliverToBoxAdapter(child: _buildHeader()),
                 SliverToBoxAdapter(child: const SizedBox(height: 16)),
-                SliverToBoxAdapter(child: _buildTabs()),
+                SliverToBoxAdapter(child: _buildTabs(usage)),
                 SliverToBoxAdapter(child: const SizedBox(height: 16)),
                 SliverToBoxAdapter(child: _buildHeroStat(usage)),
                 SliverToBoxAdapter(child: const SizedBox(height: 16)),
@@ -67,45 +65,79 @@ class _StatsScreenState extends State<StatsScreen> {
     ),
   );
 
-  Widget _buildTabs() => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 20),
-    child: Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: DG.glassBg,
-        borderRadius: BorderRadius.circular(DG.r16),
-        border: Border.all(color: DG.border),
-      ),
-      child: Row(
-        children: ['Day', 'Week', 'Month'].asMap().entries.map((e) {
-          final i = e.key; final label = e.value;
-          final sel = i == _tab;
-          return Expanded(
-            child: GestureDetector(
-              onTap: () => setState(() => _tab = i),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                decoration: BoxDecoration(
-                  gradient: sel ? DG.violetGrad : null,
-                  borderRadius: BorderRadius.circular(DG.r12),
+  Widget _buildTabs(UsageState usage) {
+    const periods = [UsagePeriod.day, UsagePeriod.week, UsagePeriod.month];
+    const labels = ['Day', 'Week', 'Month'];
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: DG.glassBg,
+          borderRadius: BorderRadius.circular(DG.r16),
+          border: Border.all(color: DG.border),
+        ),
+        child: Row(
+          children: periods.asMap().entries.map((e) {
+            final i = e.key;
+            final period = e.value;
+            final sel = period == usage.selectedPeriod;
+            return Expanded(
+              child: GestureDetector(
+                onTap: () => usage.setPeriod(period),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(
+                    gradient: sel ? DG.violetGrad : null,
+                    borderRadius: BorderRadius.circular(DG.r12),
+                  ),
+                  child: usage.loadingPeriod && sel
+                      ? const SizedBox(
+                    height: 14, width: 14,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white),
+                  )
+                      : Text(labels[i],
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: sel ? Colors.white : DG.mutedFg,
+                        fontSize: 13, fontWeight: FontWeight.w600,
+                      )),
                 ),
-                child: Text(label,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: sel ? Colors.white : DG.mutedFg,
-                      fontSize: 13, fontWeight: FontWeight.w600,
-                    )),
               ),
-            ),
-          );
-        }).toList(),
+            );
+          }).toList(),
+        ),
       ),
-    ),
-  );
+    );
+  }
+
+  String _periodLabel(UsagePeriod period) {
+    switch (period) {
+      case UsagePeriod.day:
+        return 'SCREEN TIME TODAY';
+      case UsagePeriod.week:
+        return 'SCREEN TIME THIS WEEK';
+      case UsagePeriod.month:
+        return 'SCREEN TIME THIS MONTH';
+    }
+  }
+
+  String _periodCaption(UsagePeriod period) {
+    switch (period) {
+      case UsagePeriod.day:
+        return "Today's screen time from midnight.";
+      case UsagePeriod.week:
+        return 'Total screen time over the last 7 days.';
+      case UsagePeriod.month:
+        return 'Total screen time so far this month.';
+    }
+  }
 
   Widget _buildHeroStat(UsageState usage) {
-    final total = usage.totalUsageMinutes;
+    final total = usage.currentTotalMinutes;
     final h = total ~/ 60; final m = total % 60;
     final str = h > 0 ? '${h}h ${m}m' : '${m}m';
 
@@ -114,20 +146,29 @@ class _StatsScreenState extends State<StatsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('SCREEN TIME TODAY',
-              style: TextStyle(
+          Text(_periodLabel(usage.selectedPeriod),
+              style: const TextStyle(
                   color: DG.mutedFg, fontSize: 10,
                   fontWeight: FontWeight.w700, letterSpacing: 1.5)),
           const SizedBox(height: 6),
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              ShaderMask(
-                shaderCallback: (b) => DG.violetGrad.createShader(b),
-                child: Text(str,
-                    style: const TextStyle(
-                        color: Colors.white, fontSize: 52,
-                        fontWeight: FontWeight.w800)),
+              // FIX: wrap the big number in Flexible + FittedBox so it
+              // scales down instead of overflowing the row when the
+              // string is long (e.g. "40h 45m") or the screen is narrow.
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: ShaderMask(
+                    shaderCallback: (b) => DG.violetGrad.createShader(b),
+                    child: Text(str,
+                        style: const TextStyle(
+                            color: Colors.white, fontSize: 52,
+                            fontWeight: FontWeight.w800)),
+                  ),
+                ),
               ),
               const SizedBox(width: 12),
               Container(
@@ -137,28 +178,37 @@ class _StatsScreenState extends State<StatsScreen> {
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Row(
+                  // FIX: don't let this badge Row expand and compete
+                  // for space with the hero number.
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     const Icon(Icons.trending_down_rounded,
                         color: DG.secondary, size: 14),
                     const SizedBox(width: 4),
-                    Text('Today',
-                        style: const TextStyle(
-                            color: DG.secondary, fontSize: 11,
-                            fontWeight: FontWeight.w700)),
+                    Text(
+                      usage.selectedPeriod == UsagePeriod.day
+                          ? 'Today'
+                          : usage.selectedPeriod == UsagePeriod.week
+                          ? 'This week'
+                          : 'This month',
+                      style: const TextStyle(
+                          color: DG.secondary, fontSize: 11,
+                          fontWeight: FontWeight.w700),
+                    ),
                   ],
                 ),
               ),
             ],
           ),
-          const Text("Today's screen time from midnight.",
-              style: TextStyle(color: DG.mutedFg, fontSize: 13)),
+          Text(_periodCaption(usage.selectedPeriod),
+              style: const TextStyle(color: DG.mutedFg, fontSize: 13)),
         ],
       ),
     );
   }
 
   Widget _buildBarChart(UsageState usage) {
-    final sorted = usage.dailyUsage.entries.toList()
+    final sorted = usage.currentUsage.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
     final top5 = sorted.take(5).toList();
     final maxVal = top5.isEmpty ? 1 : top5.first.value;
@@ -179,48 +229,48 @@ class _StatsScreenState extends State<StatsScreen> {
               height: 120,
               child: top5.isEmpty
                   ? const Center(
-                      child: Text('No data yet',
-                          style: TextStyle(color: DG.mutedFg)))
+                  child: Text('No data yet',
+                      style: TextStyle(color: DG.mutedFg)))
                   : Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: top5.asMap().entries.map((entry) {
-                        final i = entry.key;
-                        final e = entry.value;
-                        final pct = (e.value / maxVal).clamp(0.0, 1.0);
-                        final meta = AppNameService.getAppMeta(e.key);
-                        return Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 4),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              children: [
-                                ClipRRect(
-                                  borderRadius: const BorderRadius.vertical(
-                                      top: Radius.circular(6)),
-                                  child: Container(
-                                    width: double.infinity,
-                                    height: 100 * pct + 4,
-                                    decoration: BoxDecoration(
-                                      gradient: i == 0
-                                          ? DG.violetGrad
-                                          : LinearGradient(
-                                              colors: [
-                                                Color(meta.colorHex),
-                                                Color(meta.colorHex)
-                                                    .withAlpha(0xBB)
-                                              ],
-                                              begin: Alignment.topCenter,
-                                              end: Alignment.bottomCenter,
-                                            ),
-                                    ),
-                                  ),
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: top5.asMap().entries.map((entry) {
+                  final i = entry.key;
+                  final e = entry.value;
+                  final pct = (e.value / maxVal).clamp(0.0, 1.0);
+                  final meta = AppNameService.getAppMeta(e.key);
+                  return Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          ClipRRect(
+                            borderRadius: const BorderRadius.vertical(
+                                top: Radius.circular(6)),
+                            child: Container(
+                              width: double.infinity,
+                              height: 100 * pct + 4,
+                              decoration: BoxDecoration(
+                                gradient: i == 0
+                                    ? DG.violetGrad
+                                    : LinearGradient(
+                                  colors: [
+                                    Color(meta.colorHex),
+                                    Color(meta.colorHex)
+                                        .withAlpha(0xBB)
+                                  ],
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
                                 ),
-                              ],
+                              ),
                             ),
                           ),
-                        );
-                      }).toList(),
+                        ],
+                      ),
                     ),
+                  );
+                }).toList(),
+              ),
             ),
             // X-axis icons
             if (top5.isNotEmpty) ...[
@@ -267,7 +317,7 @@ class _StatsScreenState extends State<StatsScreen> {
                     ShaderMask(
                       shaderCallback: (b) => DG.mintGrad.createShader(b),
                       child: Text(
-                        '${usage.dailyUsage.length}',
+                        '${usage.currentUsage.length}',
                         style: const TextStyle(
                             color: Colors.white, fontSize: 13,
                             fontWeight: FontWeight.w700),
@@ -344,7 +394,7 @@ class _StatsScreenState extends State<StatsScreen> {
   );
 
   Widget _buildAppBreakdown(UsageState usage) {
-    final sorted = usage.dailyUsage.entries.toList()
+    final sorted = usage.currentUsage.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
     final apps = sorted.where((e) => e.value >= 1).toList();
 
@@ -366,78 +416,78 @@ class _StatsScreenState extends State<StatsScreen> {
             padding: const EdgeInsets.all(8),
             child: apps.isEmpty
                 ? const Padding(
-                    padding: EdgeInsets.all(20),
-                    child: Text('No app usage data yet.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: DG.mutedFg)),
-                  )
+              padding: EdgeInsets.all(20),
+              child: Text('No app usage data yet.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: DG.mutedFg)),
+            )
                 : Column(
-                    children: apps.asMap().entries.map((entry) {
-                      final i = entry.key;
-                      final e = entry.value;
-                      final max = apps.first.value;
-                      final name = AppNameService.getFriendlyName(e.key);
-                      final pct = (e.value / max).clamp(0.0, 1.0);
-                      final h = e.value ~/ 60; final m = e.value % 60;
-                      final t = h > 0 ? '${h}h ${m}m' : '${m}m';
+              children: apps.asMap().entries.map((entry) {
+                final i = entry.key;
+                final e = entry.value;
+                final max = apps.first.value;
+                final name = AppNameService.getFriendlyName(e.key);
+                final pct = (e.value / max).clamp(0.0, 1.0);
+                final h = e.value ~/ 60; final m = e.value % 60;
+                final t = h > 0 ? '${h}h ${m}m' : '${m}m';
 
-                      return Container(
-                        margin: EdgeInsets.only(
-                            bottom: i == apps.length - 1 ? 0 : 4),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 10),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(DG.r24),
-                        ),
-                        child: Row(
+                return Container(
+                  margin: EdgeInsets.only(
+                      bottom: i == apps.length - 1 ? 0 : 4),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(DG.r24),
+                  ),
+                  child: Row(
+                    children: [
+                      AppIconWidget(packageName: e.key, size: 40),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            AppIconWidget(packageName: e.key, size: 40),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(name,
-                                      style: const TextStyle(
-                                          color: DG.fg, fontSize: 13,
-                                          fontWeight: FontWeight.w600)),
-                                  const SizedBox(height: 4),
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(3),
-                                    child: LinearProgressIndicator(
-                                      value: pct,
-                                      backgroundColor: DG.muted,
-                                      valueColor:
-                                          AlwaysStoppedAnimation<Color>(
-                                              DG.primary),
-                                      minHeight: 3,
-                                    ),
-                                  ),
-                                ],
+                            Text(name,
+                                style: const TextStyle(
+                                    color: DG.fg, fontSize: 13,
+                                    fontWeight: FontWeight.w600)),
+                            const SizedBox(height: 4),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(3),
+                              child: LinearProgressIndicator(
+                                value: pct,
+                                backgroundColor: DG.muted,
+                                valueColor:
+                                AlwaysStoppedAnimation<Color>(
+                                    DG.primary),
+                                minHeight: 3,
                               ),
-                            ),
-                            const SizedBox(width: 12),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Text(t,
-                                    style: const TextStyle(
-                                        color: DG.fg, fontSize: 12,
-                                        fontWeight: FontWeight.w700)),
-                                Text(
-                                  i == 0 ? 'Most used' : '${(pct * 100).round()}%',
-                                  style: TextStyle(
-                                    color: i == 0 ? DG.accent : DG.mutedFg,
-                                    fontSize: 10, fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
                             ),
                           ],
                         ),
-                      );
-                    }).toList(),
+                      ),
+                      const SizedBox(width: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(t,
+                              style: const TextStyle(
+                                  color: DG.fg, fontSize: 12,
+                                  fontWeight: FontWeight.w700)),
+                          Text(
+                            i == 0 ? 'Most used' : '${(pct * 100).round()}%',
+                            style: TextStyle(
+                              color: i == 0 ? DG.accent : DG.mutedFg,
+                              fontSize: 10, fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
+                );
+              }).toList(),
+            ),
           ),
         ],
       ),

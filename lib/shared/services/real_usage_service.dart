@@ -73,6 +73,20 @@ class RealUsageService implements PermissionedUsageService {
 
   @override
   Future<Map<String, int>> getDailyUsage() async {
+    final now = DateTime.now();
+    final startOfDay = DateTime(now.year, now.month, now.day);
+    return getUsageForRange(startOfDay, now);
+  }
+
+  @override
+  Future<int> getTotalUsageMinutes() async {
+    final now = DateTime.now();
+    final startOfDay = DateTime(now.year, now.month, now.day);
+    return getTotalUsageMinutesForRange(startOfDay, now);
+  }
+
+  @override
+  Future<Map<String, int>> getUsageForRange(DateTime start, DateTime end) async {
     final granted = await hasPermission();
     if (!granted) {
       throw UsagePermissionDeniedException(
@@ -80,14 +94,14 @@ class RealUsageService implements PermissionedUsageService {
     }
 
     // Try event-based calculation first (most accurate)
-    final rawMs = await _computeForegroundMsFromEvents();
+    final rawMs = await _computeForegroundMsFromEvents(start, end);
 
     // If events returned nothing meaningful, fall back to aggregate API.
     // This can happen on some devices/Android versions that don't emit events
     // for all packages.
     final Map<String, int> rawMsToUse;
     if (rawMs.isEmpty) {
-      rawMsToUse = await _computeForegroundMsFromAggregate();
+      rawMsToUse = await _computeForegroundMsFromAggregate(start, end);
     } else {
       rawMsToUse = rawMs;
     }
@@ -104,14 +118,14 @@ class RealUsageService implements PermissionedUsageService {
   }
 
   @override
-  Future<int> getTotalUsageMinutes() async {
+  Future<int> getTotalUsageMinutesForRange(DateTime start, DateTime end) async {
     final granted = await hasPermission();
     if (!granted) return 0;
 
     // Sum raw ms first, then convert ONCE (avoids per-app rounding errors)
-    var rawMs = await _computeForegroundMsFromEvents();
+    var rawMs = await _computeForegroundMsFromEvents(start, end);
     if (rawMs.isEmpty) {
-      rawMs = await _computeForegroundMsFromAggregate();
+      rawMs = await _computeForegroundMsFromAggregate(start, end);
     }
     final totalMs = rawMs.values.fold<int>(0, (s, ms) => s + ms);
     return totalMs ~/ 60000;
@@ -165,15 +179,14 @@ class RealUsageService implements PermissionedUsageService {
     );
   }
 
-  // ── Method 1: event-based (precise, handles midnight boundary) ─────────────
+  // ── Method 1: event-based (precise, handles window boundary) ────────────────
 
-  Future<Map<String, int>> _computeForegroundMsFromEvents() async {
-    final now = DateTime.now();
-    final startOfDay = DateTime(now.year, now.month, now.day);
-    final startMs = startOfDay.millisecondsSinceEpoch;
-    final nowMs = now.millisecondsSinceEpoch;
+  Future<Map<String, int>> _computeForegroundMsFromEvents(
+      DateTime start, DateTime end) async {
+    final startMs = start.millisecondsSinceEpoch;
+    final endMs = end.millisecondsSinceEpoch;
 
-    final events = await UsageStats.queryEvents(startOfDay, now);
+    final events = await UsageStats.queryEvents(start, end);
 
     // Map: packageName -> timestamp(ms) of last FOREGROUND event
     final Map<String, int> foregroundStart = {};
@@ -189,7 +202,8 @@ class RealUsageService implements PermissionedUsageService {
       final ts = int.tryParse(event.timeStamp ?? '0') ?? 0;
 
       if (type == _eventForeground) {
-        // Clamp to window start so overnight sessions don't bleed in
+        // Clamp to window start so sessions that began before the window
+        // don't bleed in extra time
         foregroundStart[pkg] = ts < startMs ? startMs : ts;
       } else if (type == _eventBackground) {
         final fgStart = foregroundStart.remove(pkg);
@@ -199,11 +213,11 @@ class RealUsageService implements PermissionedUsageService {
       }
     }
 
-    // Apps still in foreground at query time: count up to now
+    // Apps still in foreground at the end of the window: count up to endMs
     for (final entry in foregroundStart.entries) {
-      if (nowMs > entry.value) {
+      if (endMs > entry.value) {
         accumulated[entry.key] =
-            (accumulated[entry.key] ?? 0) + (nowMs - entry.value);
+            (accumulated[entry.key] ?? 0) + (endMs - entry.value);
       }
     }
 
@@ -212,14 +226,11 @@ class RealUsageService implements PermissionedUsageService {
 
   // ── Method 2: aggregate API fallback ──────────────────────────────────────
 
-  Future<Map<String, int>> _computeForegroundMsFromAggregate() async {
-    final now = DateTime.now();
-    final startOfDay = DateTime(now.year, now.month, now.day);
-
+  Future<Map<String, int>> _computeForegroundMsFromAggregate(
+      DateTime start, DateTime end) async {
     final Map<String, int> rawMs = {};
 
-    final aggregated =
-    await UsageStats.queryAndAggregateUsageStats(startOfDay, now);
+    final aggregated = await UsageStats.queryAndAggregateUsageStats(start, end);
     for (final entry in aggregated.entries) {
       final pkg = entry.key;
       if (_isSystemPackage(pkg)) continue;
@@ -230,7 +241,7 @@ class RealUsageService implements PermissionedUsageService {
 
     // If aggregate is also empty, try raw queryUsageStats
     if (rawMs.isEmpty) {
-      final stats = await UsageStats.queryUsageStats(startOfDay, now);
+      final stats = await UsageStats.queryUsageStats(start, end);
       for (final info in stats) {
         final pkg = info.packageName ?? '';
         if (pkg.isEmpty || _isSystemPackage(pkg)) continue;

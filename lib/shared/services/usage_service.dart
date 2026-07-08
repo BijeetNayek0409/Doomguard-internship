@@ -9,6 +9,12 @@ class UsagePermissionDeniedException implements Exception {
 abstract class UsageService {
   Future<Map<String, int>> getDailyUsage();
   Future<int> getTotalUsageMinutes();
+
+  /// Per-app usage minutes for an arbitrary [start, end] window.
+  Future<Map<String, int>> getUsageForRange(DateTime start, DateTime end);
+
+  /// Total usage minutes for an arbitrary [start, end] window.
+  Future<int> getTotalUsageMinutesForRange(DateTime start, DateTime end);
 }
 
 abstract class PermissionedUsageService implements UsageService {

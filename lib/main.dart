@@ -6,13 +6,14 @@ import 'package:doomguard/core/theme/app_theme.dart';
 import 'package:doomguard/core/navigation/app_router.dart';
 import 'firebase_options.dart';
 import 'shared/services/real_usage_service.dart';
+import 'shared/services/notification_service.dart';
+import 'shared/services/limit_watcher_service.dart';
 import 'shared/models/usage_state.dart';
 import 'shared/models/timer_state.dart';
 import 'shared/models/streak_state.dart';
 import 'shared/models/settings_state.dart';
 import 'shared/models/auth_state.dart';
 import 'shared/models/privacy_state.dart';
-import 'shared/services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -21,23 +22,38 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-    statusBarColor: Colors.transparent,
-    statusBarIconBrightness: Brightness.light,
-  ));
+  SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+  ]);
 
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+    ),
+  );
+
+  // Initialize notifications
   await NotificationService().initialize();
+
+  // Start background usage watcher
+  LimitWatcherService().start();
 
   final authState = AuthState();
   final privacyState = PrivacyState();
 
-  runApp(DoomsGuard(authState: authState, privacyState: privacyState));
+  runApp(
+    DoomsGuard(
+      authState: authState,
+      privacyState: privacyState,
+    ),
+  );
 }
 
 class DoomsGuard extends StatefulWidget {
   final AuthState authState;
   final PrivacyState privacyState;
+
   const DoomsGuard({
     super.key,
     required this.authState,
@@ -52,18 +68,24 @@ class _DoomsGuardState extends State<DoomsGuard> {
   late final _router = createRouter(
     widget.authState,
     widget.privacyState,
-  ); // created once, never recreated
+  );
 
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider<AuthState>.value(value: widget.authState),
-        ChangeNotifierProvider<PrivacyState>.value(value: widget.privacyState),
+        ChangeNotifierProvider<AuthState>.value(
+          value: widget.authState,
+        ),
+        ChangeNotifierProvider<PrivacyState>.value(
+          value: widget.privacyState,
+        ),
         ChangeNotifierProvider<UsageState>(
           create: (_) {
             final service = RealUsageService();
-            final state = UsageState(usageService: service);
+            final state = UsageState(
+              usageService: service,
+            );
             state.loadUsage();
             return state;
           },
@@ -91,14 +113,17 @@ class _DoomsGuardState extends State<DoomsGuard> {
 }
 
 /// Watches AuthState for sign-in/out and pushes the resolved uid into
-/// StreakState and TimerState so they can sync their stats to Firestore
-/// (and hydrate once on first login per session, e.g. on a fresh install).
+/// StreakState and TimerState so they can sync their stats to Firestore.
 class _StatsSyncBootstrapper extends StatefulWidget {
   final Widget child;
-  const _StatsSyncBootstrapper({required this.child});
+
+  const _StatsSyncBootstrapper({
+    required this.child,
+  });
 
   @override
-  State<_StatsSyncBootstrapper> createState() => _StatsSyncBootstrapperState();
+  State<_StatsSyncBootstrapper> createState() =>
+      _StatsSyncBootstrapperState();
 }
 
 class _StatsSyncBootstrapperState extends State<_StatsSyncBootstrapper> {
@@ -107,14 +132,17 @@ class _StatsSyncBootstrapperState extends State<_StatsSyncBootstrapper> {
   @override
   Widget build(BuildContext context) {
     final authState = context.watch<AuthState>();
+
     final uid = authState.status == AuthStatus.authenticated
         ? authState.appUser?.uid
         : null;
 
     if (uid != _lastSyncedUid) {
       _lastSyncedUid = uid;
+
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
+
         context.read<StreakState>().setUid(uid);
         context.read<TimerState>().setUid(uid);
       });
