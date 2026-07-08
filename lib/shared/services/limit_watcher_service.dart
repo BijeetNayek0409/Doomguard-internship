@@ -1,268 +1,215 @@
-import 'package:usage_stats/usage_stats.dart';
-import 'usage_service.dart';
 
-/// Android event type constants (returned as Strings by the usage_stats package).
-const String _eventForeground = '1'; // ACTIVITY_RESUMED / MOVE_TO_FOREGROUND
-const String _eventBackground = '2'; // ACTIVITY_PAUSED  / MOVE_TO_BACKGROUND
+// lib/shared/services/limit_watcher_service.dart
 
-/// Package names that are pure system/background processes that should NOT
-/// count as user screen time.
-const _systemPackages = {
-  // ── This app ──────────────────────────────────────────────────────────────
-  'com.example.doomguard', // exclude DoomGuard itself
+import 'dart:async';
+import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'real_usage_service.dart';
+import 'notification_service.dart';
 
-  // ── Android system ────────────────────────────────────────────────────────
-  'android',
-  'android.process.media',
-  'android.process.acore',
-  'com.android.systemui',
-  'com.android.phone',
-  'com.android.bluetooth',
-  'com.android.nfc',
-  'com.android.server.telecom',
-  'com.android.settings',
-  'com.android.externalstorage',
-  'com.android.providers.media',
-  'com.android.providers.downloads',
-  'com.android.providers.contacts',
-  'com.android.providers.calendar',
-  'com.android.providers.settings',
-  'com.android.providers.telephony',
-  'com.android.inputmethod.latin',
-  'com.android.keyguard',
-  'com.android.shell',
-  'com.android.vending',
-  'com.android.defcontainer',
-  'com.android.packageinstaller',
-  'com.google.android.gms',
-  'com.google.android.gsf',
-  'com.google.process.gapps',
-  'com.google.android.partnersetup',
-  'com.google.android.onetimeinitializer',
-  'com.samsung.android.incallui',
-  'com.samsung.android.networkstack',
-  'com.sec.android.daemonapp',
-  'com.android.captiveportallogin',
+// ── Default limits (used until user-configurable limits screen is built) ───
+
+/// Per-app daily limit in minutes. Any app not listed uses [_defaultAppLimitMinutes].
+const Map<String, int> _appLimits = {
+  'com.instagram.android': 30,
+  'com.zhiliaoapp.musically': 30,  // TikTok
+  'com.facebook.katana': 30,       // Facebook
+  'com.twitter.android': 30,
+  'com.snapchat.android': 30,
+  'com.reddit.frontpage': 45,
+  'com.youtube.android': 60,
+  'com.google.android.youtube': 60,
 };
 
-/// Info about whichever app has been continuously in the foreground,
-/// without switching away, up to the moment this was queried.
-class ContinuousSession {
-  final String packageName;
-  final int startMs;
-  final int durationMs;
+const int _defaultAppLimitMinutes = 60;
 
-  const ContinuousSession({
-    required this.packageName,
-    required this.startMs,
-    required this.durationMs,
-  });
-}
+/// Total daily screen time goal in minutes (2 hours)
+const int _totalDailyLimitMinutes = 120;
 
-class RealUsageService implements PermissionedUsageService {
-  @override
-  Future<bool> hasPermission() async {
-    final granted = await UsageStats.checkUsagePermission();
-    return granted ?? false;
+/// Continuous single-app session limit in minutes before nudging
+const int _continuousSessionLimitMinutes = 30;
+
+/// How often the watcher polls usage stats (while app is open)
+const Duration _pollInterval = Duration(minutes: 1);
+
+// ── Nudge cooldown keys (stored in SharedPreferences) ─────────────────────
+// Prevents firing the same nudge repeatedly within a cooldown window.
+
+const Duration _perAppNudgeCooldown = Duration(minutes: 15);
+const Duration _continuousNudgeCooldown = Duration(minutes: 10);
+const Duration _totalScreenTimeCooldown = Duration(minutes: 30);
+
+class LimitWatcherService {
+  static final LimitWatcherService _instance = LimitWatcherService._internal();
+  factory LimitWatcherService() => _instance;
+  LimitWatcherService._internal();
+
+  final _usageService = RealUsageService();
+  final _notificationService = NotificationService();
+
+  Timer? _pollTimer;
+  bool _running = false;
+
+  /// Start the polling loop. Call this once from main.dart or after login.
+  /// Safe to call multiple times — only starts one timer.
+  void start() {
+    if (_running) return;
+    _running = true;
+    debugPrint('LimitWatcherService: started');
+
+    // Run once immediately, then on interval
+    _checkAll();
+    _pollTimer = Timer.periodic(_pollInterval, (_) => _checkAll());
   }
 
-  @override
-  Future<void> requestPermission() async {
-    await UsageStats.grantUsagePermission();
+  /// Stop polling (e.g. on sign-out).
+  void stop() {
+    _pollTimer?.cancel();
+    _pollTimer = null;
+    _running = false;
+    debugPrint('LimitWatcherService: stopped');
   }
 
-  @override
-  Future<Map<String, int>> getDailyUsage() async {
-    final granted = await hasPermission();
-    if (!granted) {
-      throw UsagePermissionDeniedException(
-          'Usage access permission required. Please grant it in settings.');
-    }
+  bool get isRunning => _running;
 
-    // Try event-based calculation first (most accurate)
-    final rawMs = await _computeForegroundMsFromEvents();
+  // ── Main check ────────────────────────────────────────────────────────────
 
-    // If events returned nothing meaningful, fall back to aggregate API.
-    // This can happen on some devices/Android versions that don't emit events
-    // for all packages.
-    final Map<String, int> rawMsToUse;
-    if (rawMs.isEmpty) {
-      rawMsToUse = await _computeForegroundMsFromAggregate();
-    } else {
-      rawMsToUse = rawMs;
-    }
+  Future<void> _checkAll() async {
+    try {
+      final hasPermission = await _usageService.hasPermission();
+      if (!hasPermission) return;
 
-    // Convert ms → minutes (floor division), keep only ≥1 full minute
-    final result = <String, int>{};
-    for (final entry in rawMsToUse.entries) {
-      final minutes = entry.value ~/ 60000;
-      if (minutes >= 1) {
-        result[entry.key] = minutes;
-      }
+      await Future.wait([
+        _checkPerAppLimits(),
+        _checkContinuousSession(),
+        _checkTotalScreenTime(),
+      ]);
+    } catch (e) {
+      debugPrint('LimitWatcherService: error during check — $e');
     }
-    return result;
   }
 
-  @override
-  Future<int> getTotalUsageMinutes() async {
-    final granted = await hasPermission();
-    if (!granted) return 0;
+  // ── Check 1: Per-app daily limits ─────────────────────────────────────────
 
-    // Sum raw ms first, then convert ONCE (avoids per-app rounding errors)
-    var rawMs = await _computeForegroundMsFromEvents();
-    if (rawMs.isEmpty) {
-      rawMs = await _computeForegroundMsFromAggregate();
-    }
-    final totalMs = rawMs.values.fold<int>(0, (s, ms) => s + ms);
-    return totalMs ~/ 60000;
-  }
+  Future<void> _checkPerAppLimits() async {
+    final usage = await _usageService.getDailyUsage(); // pkg → minutes today
 
-  /// Returns whichever app is currently open and has been continuously
-  /// in the foreground without interruption — or null if nothing
-  /// qualifies (e.g. permission missing, or the last known event was a
-  /// background/close event). Used to detect long single-app sessions
-  /// (e.g. 45+ minutes scrolling one app without switching away).
-  Future<ContinuousSession?> getCurrentContinuousSession() async {
-    final granted = await hasPermission();
-    if (!granted) return null;
+    for (final entry in usage.entries) {
+      final pkg = entry.key;
+      final usedMinutes = entry.value;
+      final limitMinutes = _appLimits[pkg] ?? _defaultAppLimitMinutes;
 
-    final now = DateTime.now();
-    final startOfDay = DateTime(now.year, now.month, now.day);
-    final events = await UsageStats.queryEvents(startOfDay, now);
+      final pct = usedMinutes / limitMinutes;
 
-    // Track the most recent unmatched FOREGROUND event per package —
-    // same walking approach as _computeForegroundMsFromEvents, but here
-    // we only care about whatever's still "open" at the very end.
-    final Map<String, int> foregroundStart = {};
-
-    for (final event in events) {
-      final pkg = event.packageName ?? '';
-      if (pkg.isEmpty || _isSystemPackage(pkg)) continue;
-
-      final type = event.eventType ?? '';
-      final ts = int.tryParse(event.timeStamp ?? '0') ?? 0;
-
-      if (type == _eventForeground) {
-        foregroundStart[pkg] = ts;
-      } else if (type == _eventBackground) {
-        foregroundStart.remove(pkg);
-      }
-    }
-
-    if (foregroundStart.isEmpty) return null;
-
-    // Only one app can genuinely be foreground at a time on Android, but
-    // guard against edge cases by picking the most recently started one.
-    final entry = foregroundStart.entries.reduce(
-          (a, b) => a.value > b.value ? a : b,
-    );
-
-    final nowMs = now.millisecondsSinceEpoch;
-    return ContinuousSession(
-      packageName: entry.key,
-      startMs: entry.value,
-      durationMs: nowMs - entry.value,
-    );
-  }
-
-  // ── Method 1: event-based (precise, handles midnight boundary) ─────────────
-
-  Future<Map<String, int>> _computeForegroundMsFromEvents() async {
-    final now = DateTime.now();
-    final startOfDay = DateTime(now.year, now.month, now.day);
-    final startMs = startOfDay.millisecondsSinceEpoch;
-    final nowMs = now.millisecondsSinceEpoch;
-
-    final events = await UsageStats.queryEvents(startOfDay, now);
-
-    // Map: packageName -> timestamp(ms) of last FOREGROUND event
-    final Map<String, int> foregroundStart = {};
-    // Map: packageName -> accumulated foreground ms
-    final Map<String, int> accumulated = {};
-
-    for (final event in events) {
-      final pkg = event.packageName ?? '';
-      if (pkg.isEmpty || _isSystemPackage(pkg)) continue;
-
-      // eventType is a String in usage_stats 1.3.1
-      final type = event.eventType ?? '';
-      final ts = int.tryParse(event.timeStamp ?? '0') ?? 0;
-
-      if (type == _eventForeground) {
-        // Clamp to window start so overnight sessions don't bleed in
-        foregroundStart[pkg] = ts < startMs ? startMs : ts;
-      } else if (type == _eventBackground) {
-        final fgStart = foregroundStart.remove(pkg);
-        if (fgStart != null && ts > fgStart) {
-          accumulated[pkg] = (accumulated[pkg] ?? 0) + (ts - fgStart);
+      if (pct >= 1.0) {
+        // Tier 3 — exceeded
+        if (await _canNudge('limit_exceeded_$pkg')) {
+          await _notificationService.showLimitExceeded(
+              _friendlyName(pkg), usedMinutes);
+          await _markNudged('limit_exceeded_$pkg');
+        }
+      } else if (pct >= 0.8) {
+        // Tier 2 — 80%
+        if (await _canNudge('limit_warn_moderate_$pkg')) {
+          await _notificationService.showLimitWarningModerate(
+              _friendlyName(pkg), usedMinutes, limitMinutes);
+          await _markNudged('limit_warn_moderate_$pkg');
+        }
+      } else if (pct >= 0.5) {
+        // Tier 1 — 50%
+        if (await _canNudge('limit_warn_gentle_$pkg')) {
+          await _notificationService.showLimitWarningGentle(
+              _friendlyName(pkg), limitMinutes);
+          await _markNudged('limit_warn_gentle_$pkg');
         }
       }
     }
+  }
 
-    // Apps still in foreground at query time: count up to now
-    for (final entry in foregroundStart.entries) {
-      if (nowMs > entry.value) {
-        accumulated[entry.key] =
-            (accumulated[entry.key] ?? 0) + (nowMs - entry.value);
+  // ── Check 2: Continuous single-app session ────────────────────────────────
+
+  Future<void> _checkContinuousSession() async {
+    final session = await _usageService.getCurrentContinuousSession();
+    if (session == null) return;
+
+    final durationMinutes = session.durationMs ~/ 60000;
+    if (durationMinutes < _continuousSessionLimitMinutes) return;
+
+    final key = 'continuous_${session.packageName}';
+    if (await _canNudge(key, cooldown: _continuousNudgeCooldown)) {
+      await _notificationService.showContinuousSessionNudge(
+          _friendlyName(session.packageName), durationMinutes);
+      await _markNudged(key);
+    }
+  }
+
+  // ── Check 3: Total daily screen time ──────────────────────────────────────
+
+  Future<void> _checkTotalScreenTime() async {
+    final totalMinutes = await _usageService.getTotalUsageMinutes();
+
+    // Nudge at 2h, 3h, 4h thresholds
+    final thresholds = [_totalDailyLimitMinutes, 180, 240];
+
+    for (final threshold in thresholds) {
+      if (totalMinutes >= threshold) {
+        final key = 'total_screen_${threshold}min';
+        if (await _canNudge(key, cooldown: _totalScreenTimeCooldown)) {
+          await _notificationService.showTotalScreenTimeNudge(totalMinutes);
+          await _markNudged(key);
+          break; // only fire one total-screen-time nudge per poll
+        }
       }
     }
-
-    return accumulated;
   }
 
-  // ── Method 2: aggregate API fallback ──────────────────────────────────────
+  // ── Cooldown helpers ──────────────────────────────────────────────────────
 
-  Future<Map<String, int>> _computeForegroundMsFromAggregate() async {
-    final now = DateTime.now();
-    final startOfDay = DateTime(now.year, now.month, now.day);
-
-    final Map<String, int> rawMs = {};
-
-    final aggregated =
-    await UsageStats.queryAndAggregateUsageStats(startOfDay, now);
-    for (final entry in aggregated.entries) {
-      final pkg = entry.key;
-      if (_isSystemPackage(pkg)) continue;
-
-      final ms = _parseMs(entry.value.totalTimeInForeground);
-      if (ms > 0) rawMs[pkg] = (rawMs[pkg] ?? 0) + ms;
-    }
-
-    // If aggregate is also empty, try raw queryUsageStats
-    if (rawMs.isEmpty) {
-      final stats = await UsageStats.queryUsageStats(startOfDay, now);
-      for (final info in stats) {
-        final pkg = info.packageName ?? '';
-        if (pkg.isEmpty || _isSystemPackage(pkg)) continue;
-        final ms = _parseMs(info.totalTimeInForeground);
-        if (ms > 0) rawMs[pkg] = (rawMs[pkg] ?? 0) + ms;
-      }
-    }
-
-    return rawMs;
+  Future<bool> _canNudge(String key,
+      {Duration cooldown = _perAppNudgeCooldown}) async {
+    final prefs = await SharedPreferences.getInstance();
+    final lastMs = prefs.getInt('nudge_ts_$key') ?? 0;
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    return (nowMs - lastMs) >= cooldown.inMilliseconds;
   }
 
-  // ── helpers ────────────────────────────────────────────────────────────────
-
-  static int _parseMs(String? value) {
-    if (value == null || value.isEmpty) return 0;
-    return int.tryParse(value) ?? 0;
+  Future<void> _markNudged(String key) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(
+        'nudge_ts_$key', DateTime.now().millisecondsSinceEpoch);
   }
 
-  static bool _isSystemPackage(String pkg) {
-    if (_systemPackages.contains(pkg)) return true;
-    // Heuristic: com.android.* packages that aren't user-visible apps
-    if (pkg.startsWith('com.android.') &&
-        !pkg.contains('chrome') &&
-        !pkg.contains('camera') &&
-        !pkg.contains('gallery') &&
-        !pkg.contains('dialer') &&
-        !pkg.contains('contacts') &&
-        !pkg.contains('messaging') &&
-        !pkg.contains('mms') &&
-        !pkg.contains('calculator')) {
-      return true;
+  /// Clears all nudge cooldown timestamps — useful for testing.
+  Future<void> resetAllCooldowns() async {
+    final prefs = await SharedPreferences.getInstance();
+    final keys = prefs.getKeys().where((k) => k.startsWith('nudge_ts_'));
+    for (final k in keys) {
+      await prefs.remove(k);
     }
-    return false;
+    debugPrint('LimitWatcherService: all nudge cooldowns cleared');
+  }
+
+  // ── Package name → friendly display name ─────────────────────────────────
+
+  static const Map<String, String> _friendlyNames = {
+    'com.instagram.android': 'Instagram',
+    'com.zhiliaoapp.musically': 'TikTok',
+    'com.facebook.katana': 'Facebook',
+    'com.twitter.android': 'Twitter/X',
+    'com.snapchat.android': 'Snapchat',
+    'com.reddit.frontpage': 'Reddit',
+    'com.youtube.android': 'YouTube',
+    'com.google.android.youtube': 'YouTube',
+    'com.whatsapp': 'WhatsApp',
+    'com.google.android.gm': 'Gmail',
+    'com.netflix.mediaclient': 'Netflix',
+  };
+
+  static String _friendlyName(String pkg) {
+    if (_friendlyNames.containsKey(pkg)) return _friendlyNames[pkg]!;
+    // Fallback: extract last segment of package name and capitalise
+    final parts = pkg.split('.');
+    final last = parts.last;
+    return last[0].toUpperCase() + last.substring(1);
   }
 }
