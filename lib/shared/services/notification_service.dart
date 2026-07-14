@@ -1,4 +1,3 @@
-
 // lib/shared/services/notification_service.dart
 
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -28,6 +27,29 @@ class NotificationService {
     );
 
     await _notificationsPlugin.initialize(initializationSettings);
+
+    // ── Android 13+ (API 33+) requires an explicit runtime request for
+    // POST_NOTIFICATIONS. Declaring it in AndroidManifest.xml alone is
+    // NOT enough — without this call, showNotification() will silently
+    // do nothing on affected devices.
+    final androidPlugin = _notificationsPlugin
+        .resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+
+    final granted = await androidPlugin?.requestNotificationsPermission();
+    // Optional: surface this in logs while debugging delivery issues.
+    // debugPrint('NotificationService: POST_NOTIFICATIONS granted = $granted');
+  }
+
+  /// Check current notification permission state without prompting.
+  /// Useful for debugging or showing an in-app "notifications disabled"
+  /// banner if the user denied the system prompt.
+  Future<bool> areNotificationsEnabled() async {
+    final androidPlugin = _notificationsPlugin
+        .resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+    final enabled = await androidPlugin?.areNotificationsEnabled();
+    return enabled ?? false;
   }
 
   Future<void> showNotification({

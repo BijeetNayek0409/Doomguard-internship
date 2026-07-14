@@ -88,10 +88,6 @@ class SettingsScreen extends StatelessWidget {
                       label: 'Daily goal',
                       value: _fmtLimit(settings.dailyLimitMinutes),
                     ),
-                    const _SettingsItem(
-                      icon: Icons.shield_rounded,
-                      label: 'Privacy',
-                    ),
                   ]),
                 ),
                 const SliverToBoxAdapter(child: SizedBox(height: 16)),
