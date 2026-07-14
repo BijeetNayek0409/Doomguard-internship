@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../../shared/models/usage_state.dart';
 import '../../../shared/models/settings_state.dart';
@@ -21,9 +22,9 @@ class DashboardScreen extends StatelessWidget {
             children: [
               // Aurora background blobs
               Positioned(top: -60, right: -60,
-                child: _blob(200, DG.primary.withAlpha(0x33))),
+                  child: _blob(200, DG.primary.withAlpha(0x33))),
               Positioned(bottom: 100, left: -40,
-                child: _blob(160, DG.secondary.withAlpha(0x22))),
+                  child: _blob(160, DG.secondary.withAlpha(0x22))),
 
               SafeArea(
                 child: RefreshIndicator(
@@ -35,13 +36,13 @@ class DashboardScreen extends StatelessWidget {
                       SliverToBoxAdapter(child: _buildHeader(streak)),
                       SliverToBoxAdapter(child: const SizedBox(height: 20)),
                       SliverToBoxAdapter(
-                        child: _buildHeroCard(usage, settings, streak),
+                        child: _buildHeroCard(context, usage, settings, streak),
                       ),
                       SliverToBoxAdapter(child: const SizedBox(height: 16)),
-                      SliverToBoxAdapter(child: _buildQuickActions()),
+                      SliverToBoxAdapter(child: _buildQuickActions(context)),
                       SliverToBoxAdapter(child: const SizedBox(height: 20)),
                       SliverToBoxAdapter(
-                        child: _buildTopOffenders(usage, settings),
+                        child: _buildTopOffenders(context, usage, settings),
                       ),
                       SliverToBoxAdapter(child: const SizedBox(height: 20)),
                       SliverToBoxAdapter(
@@ -120,7 +121,7 @@ class DashboardScreen extends StatelessWidget {
     child: Center(child: child),
   );
 
-  Widget _buildHeroCard(UsageState usage, SettingsState settings, StreakState streak) {
+  Widget _buildHeroCard(BuildContext context, UsageState usage, SettingsState settings, StreakState streak) {
     final total = usage.totalUsageMinutes;
     final limit = settings.dailyLimitMinutes;
     final progress = (total / limit).clamp(0.0, 1.0);
@@ -140,25 +141,25 @@ class DashboardScreen extends StatelessWidget {
           child: Stack(
             children: [
               Positioned(top: -40, right: -40,
-                child: Container(
-                  width: 160, height: 160,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(colors: [
-                      DG.primary.withAlpha(0x44), Colors.transparent,
-                    ]),
-                  ),
-                )),
+                  child: Container(
+                    width: 160, height: 160,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(colors: [
+                        DG.primary.withAlpha(0x44), Colors.transparent,
+                      ]),
+                    ),
+                  )),
               Positioned(bottom: -50, left: -30,
-                child: Container(
-                  width: 140, height: 140,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(colors: [
-                      DG.secondary.withAlpha(0x33), Colors.transparent,
-                    ]),
-                  ),
-                )),
+                  child: Container(
+                    width: 140, height: 140,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(colors: [
+                        DG.secondary.withAlpha(0x33), Colors.transparent,
+                      ]),
+                    ),
+                  )),
               Padding(
                 padding: const EdgeInsets.all(24),
                 child: Column(
@@ -223,52 +224,55 @@ class DashboardScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 16),
                     // Streak chip
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: DG.streak.withAlpha(0x1A),
-                        borderRadius: BorderRadius.circular(DG.r16),
-                        border: Border.all(color: DG.streak.withAlpha(0x44)),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 36, height: 36,
-                            decoration: BoxDecoration(
-                              gradient: DG.streakGrad,
-                              borderRadius: BorderRadius.circular(10),
+                    GestureDetector(
+                      onTap: () => context.go('/streaks'),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: DG.streak.withAlpha(0x1A),
+                          borderRadius: BorderRadius.circular(DG.r16),
+                          border: Border.all(color: DG.streak.withAlpha(0x44)),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 36, height: 36,
+                              decoration: BoxDecoration(
+                                gradient: DG.streakGrad,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(Icons.local_fire_department,
+                                  color: Colors.white, size: 18),
                             ),
-                            child: const Icon(Icons.local_fire_department,
-                                color: Colors.white, size: 18),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                ShaderMask(
-                                  shaderCallback: (b) => DG.streakGrad.createShader(b),
-                                  child: Text(
-                                    streak.currentStreak > 0
-                                        ? '${streak.currentStreak} day streak 🔥'
-                                        : 'Start your streak today!',
-                                    style: const TextStyle(
-                                        color: Colors.white, fontSize: 13,
-                                        fontWeight: FontWeight.w700),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  ShaderMask(
+                                    shaderCallback: (b) => DG.streakGrad.createShader(b),
+                                    child: Text(
+                                      streak.currentStreak > 0
+                                          ? '${streak.currentStreak} day streak 🔥'
+                                          : 'Start your streak today!',
+                                      style: const TextStyle(
+                                          color: Colors.white, fontSize: 13,
+                                          fontWeight: FontWeight.w700),
+                                    ),
                                   ),
-                                ),
-                                Text(
-                                  streak.currentStreak > 0
-                                      ? 'Keep it going — you\'re doing great.'
-                                      : 'Complete a focus session to begin.',
-                                  style: const TextStyle(
-                                      color: DG.mutedFg, fontSize: 11),
-                                ),
-                              ],
+                                  Text(
+                                    streak.currentStreak > 0
+                                        ? 'Keep it going — you\'re doing great.'
+                                        : 'Complete a focus session to begin.',
+                                    style: const TextStyle(
+                                        color: DG.mutedFg, fontSize: 11),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                          const Icon(Icons.chevron_right, color: DG.mutedFg, size: 16),
-                        ],
+                            const Icon(Icons.chevron_right, color: DG.mutedFg, size: 16),
+                          ],
+                        ),
                       ),
                     ),
                   ],
@@ -295,11 +299,11 @@ class DashboardScreen extends StatelessWidget {
     ],
   );
 
-  Widget _buildQuickActions() {
+  Widget _buildQuickActions(BuildContext context) {
     final actions = [
-      ('Focus', Icons.timer_rounded, DG.violetGrad),
-      ('Stats', Icons.bar_chart_rounded, DG.mintGrad),
-      ('Limits', Icons.lock_rounded, DG.coralGrad),
+      ('Focus', Icons.timer_rounded, DG.violetGrad, '/timer'),
+      ('Stats', Icons.bar_chart_rounded, DG.mintGrad, '/stats'),
+      ('Limits', Icons.lock_rounded, DG.coralGrad, '/settings'),
     ];
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -308,30 +312,41 @@ class DashboardScreen extends StatelessWidget {
           return Expanded(
             child: Padding(
               padding: EdgeInsets.only(right: a.$1 == 'Limits' ? 0 : 10),
-              child: Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: DG.glassBg,
-                  borderRadius: BorderRadius.circular(DG.r24),
-                  border: Border.all(color: DG.border),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 38, height: 38,
-                      decoration: BoxDecoration(
-                        gradient: a.$3,
-                        borderRadius: BorderRadius.circular(12),
+              child: GestureDetector(
+                onTap: () {
+                  if (a.$1 == 'Limits') {
+                    // Go to Settings and flag that Daily Limit should be
+                    // opened/scrolled-to once there.
+                    context.go('/settings', extra: {'scrollTo': 'dailyLimit'});
+                  } else {
+                    context.go(a.$4);
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: DG.glassBg,
+                    borderRadius: BorderRadius.circular(DG.r24),
+                    border: Border.all(color: DG.border),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 38, height: 38,
+                        decoration: BoxDecoration(
+                          gradient: a.$3,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(a.$2, color: Colors.white, size: 18),
                       ),
-                      child: Icon(a.$2, color: Colors.white, size: 18),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(a.$1,
-                        style: const TextStyle(
-                            color: DG.fg, fontSize: 12,
-                            fontWeight: FontWeight.w700)),
-                  ],
+                      const SizedBox(height: 8),
+                      Text(a.$1,
+                          style: const TextStyle(
+                              color: DG.fg, fontSize: 12,
+                              fontWeight: FontWeight.w700)),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -341,7 +356,7 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildTopOffenders(UsageState usage, SettingsState settings) {
+  Widget _buildTopOffenders(BuildContext context, UsageState usage, SettingsState settings) {
     if (usage.loading) {
       return const Padding(
         padding: EdgeInsets.symmetric(horizontal: 20),
@@ -371,10 +386,13 @@ class DashboardScreen extends StatelessWidget {
               const Text('Top offenders',
                   style: TextStyle(
                       color: DG.fg, fontSize: 18, fontWeight: FontWeight.w700)),
-              Text('See all',
-                  style: TextStyle(
-                      color: DG.mutedFg, fontSize: 11,
-                      fontWeight: FontWeight.w700, letterSpacing: 0.8)),
+              GestureDetector(
+                onTap: () => context.go('/stats', extra: {'tab': 'appBreakdown'}),
+                child: Text('See all',
+                    style: TextStyle(
+                        color: DG.mutedFg, fontSize: 11,
+                        fontWeight: FontWeight.w700, letterSpacing: 0.8)),
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -387,26 +405,26 @@ class DashboardScreen extends StatelessWidget {
             padding: const EdgeInsets.all(8),
             child: top3.isEmpty
                 ? const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Text(
-                      'No significant usage yet today.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: DG.mutedFg),
-                    ),
-                  )
+              padding: EdgeInsets.all(16),
+              child: Text(
+                'No significant usage yet today.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: DG.mutedFg),
+              ),
+            )
                 : Column(
-                    children: top3.asMap().entries.map((entry) {
-                      final i = entry.key;
-                      final e = entry.value;
-                      final max = top3.first.value;
-                      return _AppRow(
-                        packageName: e.key,
-                        minutes: e.value,
-                        maxMinutes: max,
-                        isLast: i == top3.length - 1,
-                      );
-                    }).toList(),
-                  ),
+              children: top3.asMap().entries.map((entry) {
+                final i = entry.key;
+                final e = entry.value;
+                final max = top3.first.value;
+                return _AppRow(
+                  packageName: e.key,
+                  minutes: e.value,
+                  maxMinutes: max,
+                  isLast: i == top3.length - 1,
+                );
+              }).toList(),
+            ),
           ),
         ],
       ),
@@ -438,14 +456,14 @@ class DashboardScreen extends StatelessWidget {
           child: Stack(
             children: [
               Positioned(top: -20, right: -20,
-                child: Container(
-                  width: 100, height: 100,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                        colors: [DG.accent.withAlpha(0x44), Colors.transparent]),
-                  ),
-                )),
+                  child: Container(
+                    width: 100, height: 100,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                          colors: [DG.accent.withAlpha(0x44), Colors.transparent]),
+                    ),
+                  )),
               Padding(
                 padding: const EdgeInsets.all(20),
                 child: Row(
@@ -535,7 +553,7 @@ class _AppRow extends StatelessWidget {
   final int maxMinutes;
   final bool isLast;
   const _AppRow({required this.packageName, required this.minutes,
-      required this.maxMinutes, required this.isLast});
+    required this.maxMinutes, required this.isLast});
 
   @override
   Widget build(BuildContext context) {
