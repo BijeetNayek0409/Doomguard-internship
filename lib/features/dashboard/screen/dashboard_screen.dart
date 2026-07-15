@@ -7,6 +7,7 @@ import '../../../shared/models/settings_state.dart';
 import '../../../shared/models/streak_state.dart';
 import '../../../shared/services/app_name_service.dart';
 import '../../../shared/widgets/app_icon_widget.dart';
+import '../../../shared/widgets/secure_section_guard.dart';
 import '../../../core/theme/app_theme.dart';
 
 class DashboardScreen extends StatelessWidget {
@@ -42,7 +43,16 @@ class DashboardScreen extends StatelessWidget {
                       SliverToBoxAdapter(child: _buildQuickActions(context)),
                       SliverToBoxAdapter(child: const SizedBox(height: 20)),
                       SliverToBoxAdapter(
-                        child: _buildTopOffenders(context, usage, settings),
+                        // NOTE: locked reads settings.strictMode — adjust
+                        // this getter name if your SettingsState calls it
+                        // something else.
+                        child: SecureSectionGuard(
+                          locked: settings.strictMode,
+                          title: 'Top Offenders',
+                          reason: 'Authenticate to view Top Offenders',
+                          childBuilder: (_) =>
+                              _buildTopOffenders(context, usage, settings),
+                        ),
                       ),
                       SliverToBoxAdapter(child: const SizedBox(height: 20)),
                       SliverToBoxAdapter(

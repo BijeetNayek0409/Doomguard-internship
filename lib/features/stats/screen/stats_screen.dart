@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../../shared/models/usage_state.dart';
 import '../../../shared/models/timer_state.dart';
+import '../../../shared/models/settings_state.dart';
 import '../../../shared/services/app_name_service.dart';
 import '../../../shared/widgets/app_icon_widget.dart';
+import '../../../shared/widgets/secure_section_guard.dart';
 import '../../../core/theme/app_theme.dart';
 
 class StatsScreen extends StatefulWidget {
@@ -13,10 +16,34 @@ class StatsScreen extends StatefulWidget {
 }
 
 class _StatsScreenState extends State<StatsScreen> {
+  final _appBreakdownKey = GlobalKey();
+  bool _scrollHandled = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_scrollHandled) return;
+    _scrollHandled = true;
+
+    final extra = GoRouterState.of(context).extra;
+    if (extra is Map && extra['tab'] == 'appBreakdown') {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final ctx = _appBreakdownKey.currentContext;
+        if (ctx != null) {
+          Scrollable.ensureVisible(
+            ctx,
+            duration: const Duration(milliseconds: 400),
+            curve: Curves.easeInOut,
+          );
+        }
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Consumer2<UsageState, TimerState>(
-      builder: (_, usage, timer, __) {
+    return Consumer3<UsageState, TimerState, SettingsState>(
+      builder: (_, usage, timer, settings, __) {
         return Scaffold(
           backgroundColor: DG.bg,
           body: SafeArea(
@@ -32,7 +59,21 @@ class _StatsScreenState extends State<StatsScreen> {
                 SliverToBoxAdapter(child: const SizedBox(height: 16)),
                 SliverToBoxAdapter(child: _buildInsightCard(timer)),
                 SliverToBoxAdapter(child: const SizedBox(height: 16)),
-                SliverToBoxAdapter(child: _buildAppBreakdown(usage)),
+                SliverToBoxAdapter(
+                  child: Container(
+                    key: _appBreakdownKey,
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    // NOTE: locked reads settings.strictMode — adjust this
+                    // getter name if your SettingsState calls it something
+                    // else.
+                    child: SecureSectionGuard(
+                      locked: settings.strictMode,
+                      title: 'App Breakdown',
+                      reason: 'Authenticate to view App Breakdown',
+                      childBuilder: (_) => _buildAppBreakdown(usage),
+                    ),
+                  ),
+                ),
                 const SliverToBoxAdapter(child: SizedBox(height: 100)),
               ],
             ),
@@ -154,9 +195,6 @@ class _StatsScreenState extends State<StatsScreen> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // FIX: wrap the big number in Flexible + FittedBox so it
-              // scales down instead of overflowing the row when the
-              // string is long (e.g. "40h 45m") or the screen is narrow.
               Flexible(
                 child: FittedBox(
                   fit: BoxFit.scaleDown,
@@ -178,8 +216,6 @@ class _StatsScreenState extends State<StatsScreen> {
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Row(
-                  // FIX: don't let this badge Row expand and compete
-                  // for space with the hero number.
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     const Icon(Icons.trending_down_rounded,
@@ -224,7 +260,6 @@ class _StatsScreenState extends State<StatsScreen> {
         ),
         child: Column(
           children: [
-            // Bars
             SizedBox(
               height: 120,
               child: top5.isEmpty
@@ -272,7 +307,6 @@ class _StatsScreenState extends State<StatsScreen> {
                 }).toList(),
               ),
             ),
-            // X-axis icons
             if (top5.isNotEmpty) ...[
               const SizedBox(height: 8),
               Row(
@@ -398,99 +432,96 @@ class _StatsScreenState extends State<StatsScreen> {
       ..sort((a, b) => b.value.compareTo(a.value));
     final apps = sorted.where((e) => e.value >= 1).toList();
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('App breakdown',
-              style: TextStyle(
-                  color: DG.fg, fontSize: 18, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 12),
-          Container(
-            decoration: BoxDecoration(
-              color: DG.glassBg,
-              borderRadius: BorderRadius.circular(DG.r32),
-              border: Border.all(color: DG.border),
-            ),
-            padding: const EdgeInsets.all(8),
-            child: apps.isEmpty
-                ? const Padding(
-              padding: EdgeInsets.all(20),
-              child: Text('No app usage data yet.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: DG.mutedFg)),
-            )
-                : Column(
-              children: apps.asMap().entries.map((entry) {
-                final i = entry.key;
-                final e = entry.value;
-                final max = apps.first.value;
-                final name = AppNameService.getFriendlyName(e.key);
-                final pct = (e.value / max).clamp(0.0, 1.0);
-                final h = e.value ~/ 60; final m = e.value % 60;
-                final t = h > 0 ? '${h}h ${m}m' : '${m}m';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('App breakdown',
+            style: TextStyle(
+                color: DG.fg, fontSize: 18, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 12),
+        Container(
+          decoration: BoxDecoration(
+            color: DG.glassBg,
+            borderRadius: BorderRadius.circular(DG.r32),
+            border: Border.all(color: DG.border),
+          ),
+          padding: const EdgeInsets.all(8),
+          child: apps.isEmpty
+              ? const Padding(
+            padding: EdgeInsets.all(20),
+            child: Text('No app usage data yet.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: DG.mutedFg)),
+          )
+              : Column(
+            children: apps.asMap().entries.map((entry) {
+              final i = entry.key;
+              final e = entry.value;
+              final max = apps.first.value;
+              final name = AppNameService.getFriendlyName(e.key);
+              final pct = (e.value / max).clamp(0.0, 1.0);
+              final h = e.value ~/ 60; final m = e.value % 60;
+              final t = h > 0 ? '${h}h ${m}m' : '${m}m';
 
-                return Container(
-                  margin: EdgeInsets.only(
-                      bottom: i == apps.length - 1 ? 0 : 4),
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 10),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(DG.r24),
-                  ),
-                  child: Row(
-                    children: [
-                      AppIconWidget(packageName: e.key, size: 40),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(name,
-                                style: const TextStyle(
-                                    color: DG.fg, fontSize: 13,
-                                    fontWeight: FontWeight.w600)),
-                            const SizedBox(height: 4),
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(3),
-                              child: LinearProgressIndicator(
-                                value: pct,
-                                backgroundColor: DG.muted,
-                                valueColor:
-                                AlwaysStoppedAnimation<Color>(
-                                    DG.primary),
-                                minHeight: 3,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
+              return Container(
+                margin: EdgeInsets.only(
+                    bottom: i == apps.length - 1 ? 0 : 4),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(DG.r24),
+                ),
+                child: Row(
+                  children: [
+                    AppIconWidget(packageName: e.key, size: 40),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(t,
+                          Text(name,
                               style: const TextStyle(
-                                  color: DG.fg, fontSize: 12,
-                                  fontWeight: FontWeight.w700)),
-                          Text(
-                            i == 0 ? 'Most used' : '${(pct * 100).round()}%',
-                            style: TextStyle(
-                              color: i == 0 ? DG.accent : DG.mutedFg,
-                              fontSize: 10, fontWeight: FontWeight.w600,
+                                  color: DG.fg, fontSize: 13,
+                                  fontWeight: FontWeight.w600)),
+                          const SizedBox(height: 4),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(3),
+                            child: LinearProgressIndicator(
+                              value: pct,
+                              backgroundColor: DG.muted,
+                              valueColor:
+                              AlwaysStoppedAnimation<Color>(
+                                  DG.primary),
+                              minHeight: 3,
                             ),
                           ),
                         ],
                       ),
-                    ],
-                  ),
-                );
-              }).toList(),
-            ),
+                    ),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(t,
+                            style: const TextStyle(
+                                color: DG.fg, fontSize: 12,
+                                fontWeight: FontWeight.w700)),
+                        Text(
+                          i == 0 ? 'Most used' : '${(pct * 100).round()}%',
+                          style: TextStyle(
+                            color: i == 0 ? DG.accent : DG.mutedFg,
+                            fontSize: 10, fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
