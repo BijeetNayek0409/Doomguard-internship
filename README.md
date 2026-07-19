@@ -95,6 +95,8 @@ doomguard/
 
 DoomGuard was developed as an internship project by a team of second-year B.Tech students (Artificial Intelligence and Data Science) at KJ Somaiya School of Engineering, under faculty guidance, over an eight-week development cycle covering the full SDLC — from requirements gathering to final deployment testing on a physical Android device.
 
+Created by Bijeet , Vini , Eshita , Abhinay
+
 
 
 ---
