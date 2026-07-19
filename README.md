@@ -1,77 +1,126 @@
+<div align="center">
+
 # 🛡️ DoomGuard
 
-DoomGuard is a Flutter-based digital wellbeing application designed to help users reduce doomscrolling habits, improve focus, and build healthier screen usage patterns through gamification and personalized insights.
+### Take back your screen time.
 
- Implementation of child alternate email is in progress
-parents or guardian will recieve weekly reports of the usage of child
+A Flutter-based digital wellbeing app that helps you monitor screen time, build focus habits, and break the doomscrolling cycle — with real-time tracking, a Pomodoro-style focus timer, streaks, and a badge-based reward system.
 
-Alternate email id done
+[![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
+[![Dart](https://img.shields.io/badge/Dart-3.3+-0175C2?logo=dart&logoColor=white)](https://dart.dev)
+[![Firebase](https://img.shields.io/badge/Firebase-Auth%20%2B%20Firestore-FFCA28?logo=firebase&logoColor=black)](https://firebase.google.com)
+[![Platform](https://img.shields.io/badge/Platform-Android-3DDC84?logo=android&logoColor=white)](#)
+[![License](https://img.shields.io/badge/License-MIT-lightgrey)](#license)
+
+</div>
+
+---
+
+## Overview
+
+Excessive, unregulated smartphone use — doomscrolling in particular — has been linked to poor sleep, reduced attention span, and lower productivity. **DoomGuard** tackles this with real-time usage analytics wrapped in a gamified experience, so building healthier screen habits feels rewarding instead of restrictive.
+
+The app tracks per-app usage, sends smart notification nudges as limits are approached, and rewards consistent focus sessions and daily streaks through an achievement system — all backed by Firebase for secure, cross-device sync.
 
 ## ✨ Features
 
-- 🔐 Google Sign-In Authentication
-- 📊 User Statistics Dashboard
-- 🏅 Badge and Achievement System
-- 🔥 Daily Streak Tracking
-- ⏱️ Focus Timer Sessions
-- 📈 Progress Monitoring
-- 📝 Survey Data Collection
-- 💬 Feedback System
-- 🌙 Wind-down Mode
-- 🚫 Strict Mode
-- 🔔 Smart Nudges and Notifications
-- 🎯 Daily Goals and Usage Limits
+- 📊 **Real-time screen time tracking** — per-app usage breakdown with day/week/month views
+- ⏱️ **Pomodoro-based focus timer** — Pomodoro (25m), Deep Work (50m), Flow (90m), and Quick (15m) presets
+- 🔥 **Streak system** — tracks current and longest streaks, with a once-a-week streak freeze
+- 🏆 **Badge & achievement system** — 8 unlockable badges based on real usage milestones
+- 🔔 **Smart nudges** — tiered notifications for per-app limits, continuous sessions, and total screen time
+- 🔒 **Strict Mode** — enforces usage restrictions during a user-defined wind-down window
+- 🔑 **Google Sign-In** — Firebase Authentication with Cloud Firestore-backed persistence
+- 📄 **Privacy-first onboarding** — one-time consent gate before any data collection
 
-## 🏆 Badge System
+## 📱 Screenshots
 
-Users earn badges automatically based on their activity and progress, including:
-
-- 🌱 First Step
-- 🔥 7-Day Streak
-- ⚡ Focus Master
-- 🌙 Night Owl Tamed
-- 🧘 Zen Mode
-- 💎 Deep Worker
-- ⏰ Time Saver
-- 🏆 30-Day Legend
-
-## ☁️ Firebase Integration
-
-The app uses Firebase for:
-
-- Firebase Authentication (Google Sign-In)
-- Cloud Firestore Database
-- User Progress Synchronization
-- Badge Persistence
-- Survey and Feedback Storage
+<table>
+  <tr>
+    <td align="center"><img src="screenshots/01_onboarding_privacy.jpg" width="180"/><br/><sub>Privacy Policy</sub></td>
+    <td align="center"><img src="screenshots/02_login.jpg" width="180"/><br/><sub>Sign In</sub></td>
+    <td align="center"><img src="screenshots/03_home_dashboard.jpg" width="180"/><br/><sub>Home Dashboard</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="screenshots/04_stats_insights.jpg" width="180"/><br/><sub>Insights</sub></td>
+    <td align="center"><img src="screenshots/05_focus_timer.jpg" width="180"/><br/><sub>Focus Timer</sub></td>
+    <td align="center"><img src="screenshots/06_streaks_rewards.jpg" width="180"/><br/><sub>Streaks & Rewards</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="screenshots/07_badges.jpg" width="180"/><br/><sub>Badges</sub></td>
+    <td align="center"><img src="screenshots/08_settings.jpg" width="180"/><br/><sub>Settings</sub></td>
+    <td align="center"><img src="screenshots/09_strict_mode.jpg" width="180"/><br/><sub>Strict Mode</sub></td>
+  </tr>
+</table>
 
 ## 🛠️ Tech Stack
 
-- Flutter
-- Dart
-- Firebase Authentication
-- Cloud Firestore
-- Provider State Management
-- SharedPreferences
-- Db reaver Postgre sql
+| Layer | Technology |
+|---|---|
+| Framework | Flutter 3.x / Dart 3.3+ |
+| State Management | Provider (`StreakState`, `UsageState`, `SettingsState`) |
+| Navigation | `go_router` — `StatefulShellRoute` bottom nav (Home / Stats / Timer / Streaks / Settings) |
+| Auth | Firebase Authentication (Google Sign-In) |
+| Database | Cloud Firestore (user stats, cross-device sync) |
+| Survey Backend | Supabase (`survey_responses` table, salted/hashed via `sync_surveys.py`) |
+| Usage Tracking | Android `UsageStatsManager` |
 
-## 📱 Screens
+## 🏗️ Architecture
 
-- Home
-- Statistics
-- Focus Timer
-- Streaks
-- Settings
-- Survey
-- Profile
+- **State management** is handled entirely through `Provider`, split across dedicated state classes for streaks, usage stats, and settings.
+- **Navigation** uses a `StatefulShellRoute` from `go_router` to preserve tab state across the five main sections.
+- **Data persistence** is local-first (`SharedPreferences`) with a sync layer to Cloud Firestore, so progress survives app reinstalls and carries across devices.
+- **Streak logic** computes the day-difference between the last active date and today — a gap of exactly one day triggers an automatic streak freeze (once per week); anything longer resets the streak.
+- **Badges** are computed dynamically from five underlying stats rather than stored as flags, so they stay correct even after a fresh install and data rehydration.
 
-## 🚀 Installation
+## 🚀 Getting Started
+
+### Prerequisites
+- Flutter SDK 3.x
+- A Firebase project with Authentication (Google provider) and Cloud Firestore enabled
+- An Android device or emulator running Android 8.0+ (tested on Android 16 / API 36)
+
+### Installation
 
 ```bash
-git clone <repository-url>
-cd Doomguard-internship-main
+# Clone the repository
+git clone https://github.com/<your-username>/doomguard.git
+cd doomguard
+
+# Install dependencies
 flutter pub get
+
+# Add your Firebase config
+#   - Place google-services.json in android/app/
+
+# Run the app
 flutter run
+```
 
+## 📂 Project Structure
 
+```
+doomguard/
+├── lib/
+│   ├── services/          # user_stats_service.dart, notification/nudge logic
+│   ├── state/              # streak_state.dart, usage_state.dart, settings_state.dart
+│   ├── screens/             # Home, Stats, Timer, Streaks, Settings
+│   └── main.dart
+├── android/
+├── screenshots/
+└── README.md
+```
 
+## 🎓 Project Background
+
+DoomGuard was developed as an internship project by a team of second-year B.Tech students (Artificial Intelligence and Data Science) at KJ Somaiya School of Engineering, under faculty guidance, over an eight-week development cycle covering the full SDLC — from requirements gathering to final deployment testing on a physical Android device.
+
+## 📄 License
+
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+
+---
+
+<div align="center">
+<sub>Built with Flutter & Firebase · DoomGuard v1.0</sub>
+</div>
