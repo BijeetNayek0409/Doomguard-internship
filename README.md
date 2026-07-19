@@ -33,26 +33,6 @@ The app tracks per-app usage, sends smart notification nudges as limits are appr
 - 🔑 **Google Sign-In** — Firebase Authentication with Cloud Firestore-backed persistence
 - 📄 **Privacy-first onboarding** — one-time consent gate before any data collection
 
-## 📱 Screenshots
-
-<table>
-  <tr>
-    <td align="center"><img src="screenshots/01_onboarding_privacy.jpg" width="180"/><br/><sub>Privacy Policy</sub></td>
-    <td align="center"><img src="screenshots/02_login.jpg" width="180"/><br/><sub>Sign In</sub></td>
-    <td align="center"><img src="screenshots/03_home_dashboard.jpg" width="180"/><br/><sub>Home Dashboard</sub></td>
-  </tr>
-  <tr>
-    <td align="center"><img src="screenshots/04_stats_insights.jpg" width="180"/><br/><sub>Insights</sub></td>
-    <td align="center"><img src="screenshots/05_focus_timer.jpg" width="180"/><br/><sub>Focus Timer</sub></td>
-    <td align="center"><img src="screenshots/06_streaks_rewards.jpg" width="180"/><br/><sub>Streaks & Rewards</sub></td>
-  </tr>
-  <tr>
-    <td align="center"><img src="screenshots/07_badges.jpg" width="180"/><br/><sub>Badges</sub></td>
-    <td align="center"><img src="screenshots/08_settings.jpg" width="180"/><br/><sub>Settings</sub></td>
-    <td align="center"><img src="screenshots/09_strict_mode.jpg" width="180"/><br/><sub>Strict Mode</sub></td>
-  </tr>
-</table>
-
 ## 🛠️ Tech Stack
 
 | Layer | Technology |
